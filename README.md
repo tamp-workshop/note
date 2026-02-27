@@ -1,28 +1,30 @@
 # tamp-note
 
-**Minimal CLI note taking. Part of the tamp CLI toolkit.**
+> Daily notes, plain and simple.
 
-Plain markdown files.
-No dependencies beyond standard Unix tools.
-Works on macOS and Linux.
+Open a terminal. Type a thought. Close the terminal. That's the whole workflow.
+
+No app to open. No account to create. No proprietary format that holds your notes hostage five years from now. Just markdown files in a folder you own, timestamped and tagged, findable with a single command.
+
+Your future self will know where to look. Or not, who cares.
 
 ---
 
 ## Install
 
 ```sh
-curl -o /usr/local/bin/tamp-note https://raw.githubusercontent.com/tamptools/note/main/note.sh
+curl -o /usr/local/bin/tamp-note https://raw.githubusercontent.com/tamp-workshop/note/main/note
 chmod +x /usr/local/bin/tamp-note
 ```
 
 Or clone and symlink:
 
 ```sh
-git clone https://github.com/tamp/note.git
-ln -s "$(pwd)/tamp-note/tamp-note.sh" /usr/local/bin/tamp-note
+git clone https://github.com/tamp-workshop/note.git
+ln -s "$(pwd)/note/note" /usr/local/bin/tamp-note
 ```
 
-**Recommended:** add an alias for daily use:
+**Recommended alias**: because `tamp-note` is a lot to type at 9am:
 
 ```sh
 # ~/.zshrc or ~/.bashrc
@@ -34,81 +36,58 @@ alias note='tamp-note'
 ## Usage
 
 ```sh
-tamp-note "your idea"         # Append a timestamped entry to today's log
-tamp-note                     # Open today's log in $EDITOR
-tamp-note open fonts          # Open/create ~/Notes/fonts.md (thematic note)
-tamp-note find "parser"       # Search across all notes (case-insensitive)
-tamp-note todo                # List all open +todo items with source file and line
-tamp-note done "parser bug"   # Mark matching +todo as done
-tamp-note last [n]            # Show last n entries with source date (default: 10)
-tamp-note tags                # List all @context and +action tags with counts
-tamp-note help                # Show usage
+tamp-note "your thought here"     # append a timestamped entry to today's log
+tamp-note                         # open today's log in $EDITOR
+tamp-note open fonts              # open or create ~/Notes/fonts.md
+tamp-note find "parser"           # search across all notes
+tamp-note todo                    # list all open +todo items
+tamp-note done "parser bug"       # mark matching +todo as done
+tamp-note last [n]                # show last n entries (default: 10)
+tamp-note tags                    # all tags in use, with counts
+tamp-note help                    # the full picture
 ```
 
 ---
 
 ## Tags
 
-Tags are plain text. Grep-friendly. No special syntax.
+Tags are plain text. No special syntax. Completely grep-friendly.
 
 | Tag | Purpose |
 |-----|---------|
-| `@dev` `@design` `@music` | Context — retrieve with `tamp-note find @dev` |
-| `+todo` | Actionable — surfaced by `tamp-note todo` |
+| `@dev` `@design` `@music` | Context → where does this belong? |
+| `+todo` | Something to act on |
 | `+read` `+idea` `+follow-up` | Other action types |
 
 ```sh
 tamp-note "look into Harfbuzz shaping for variable fonts @design +todo"
 ```
 
-Use `tamp-note tags` to see all tags currently in use across your notes, with counts:
-
-```
---- tags in use ---
-
-@context
-  @dev                    12
-  @design                  5
-  @music                   2
-
-+action
-  +todo                    8
-  +idea                    4
-  +read                    1
-```
+`tamp-note tags` shows everything in use across your notes, with counts. Useful for noticing that you have forty-three `+todo` items and have done none of them. Motivating, in its own way.
 
 ---
 
 ## Marking todos done
-
-`tamp-note done` finds the matching line and wraps it in markdown strikethrough:
 
 ```sh
 tamp-note done "Harfbuzz"
 # ✔  marked done in 2026-02-25.md
 ```
 
-The line becomes `- ~~09:14 look into Harfbuzz...~~` and is excluded from future `tamp-note todo` output.
+The line becomes `~~09:14 look into Harfbuzz...~~`. Struck through in markdown, excluded from future `tamp-note todo` output. Visible history, not silent deletion.
 
 ---
 
 ## File structure
 
+Notes live in plain markdown files. Yours, forever.
+
 ```
 ~/Notes/
-  2026-02-25.md       # daily log (auto-created)
+  2026-02-25.md       # today's log → auto-created on first entry
   2026-02-24.md
-  fonts.md            # thematic note  (tamp-note open fonts)
+  fonts.md            # thematic note (tamp-note open fonts)
   compilers.md
-```
-
-Daily logs are plain Markdown:
-
-```markdown
-# Tuesday, February 25 2026
-
-- 09:14 look into Harfbuzz shaping for variable fonts @design +todo
-- 11:42 cache invalidation idea for the parser @dev +idea
 ```
 
 ---
@@ -117,45 +96,25 @@ Daily logs are plain Markdown:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NOTES_DIR` | `~/Notes` | Where notes are stored |
-| `EDITOR` | `vim` | Editor used by `tamp-note` and `tamp-note open` |
+| `NOTES_DIR` | `~/Notes` | Where notes live |
+| `EDITOR` | `vim` | Editor for `tamp-note` and `tamp-note open` |
+
+---
+
+## One zsh quirk worth knowing
+
+The `!` character triggers history expansion inside double quotes:
 
 ```sh
-export NOTES_DIR="$HOME/Notes"
-export EDITOR="nvim"
+note "Ship it!"   # ❌ hangs in zsh
+note 'Ship it!'   # ✔  single quotes are your friend
 ```
 
----
-
-## Shell quirks
-
-**zsh:** The `!` character triggers history expansion inside double quotes, causing the prompt to hang:
-
-```sh
-note "Hello notes!"   # ❌ hangs in zsh
-note 'Hello notes!'   # ✔ use single quotes instead
-```
-
-To disable this behaviour permanently, add to your `~/.zshrc`:
-
-```sh
-setopt NO_BANG_HIST
-```
+Or add `setopt NO_BANG_HIST` to your `~/.zshrc` and forget this ever came up.
 
 ---
 
-## About tamp
+## Part of tamp
 
-Small tools. Only necessary parts.
-
----
-
-## Contributing
-
-Intentionally small. Good contributions: bug fixes, shell compatibility, new subcommands that follow the same minimal philosophy. Please don't add dependencies.
-
----
-
-## License
-
-MIT
+A considered working environment for programmers who care.  
+[github.com/tamp-workshop](https://github.com/tamp-workshop) · MIT License
