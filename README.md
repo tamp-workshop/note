@@ -1,120 +1,150 @@
-# tamp-note
+# tamp v0.8.0
 
-> Daily notes, plain and simple.
+> Small tools for people who think in plain text.
 
-Open a terminal. Type a thought. Close the terminal. That's the whole workflow.
+tamp is a collection of command-line tools built around a single idea:
+your notes, tasks, and thoughts should live in plain markdown files
+that you own, on your machine, forever.
 
-No app to open. No account to create. No proprietary format that holds your notes hostage five years from now. Just markdown files in a folder you own, timestamped and tagged, findable with a single command.
-
-Your future self will know where to look. Or not, who cares.
-
----
-
-## Install
-
-```sh
-curl -o /usr/local/bin/tamp-note https://raw.githubusercontent.com/tamp-workshop/note/main/note
-chmod +x /usr/local/bin/tamp-note
-```
-
-Or clone and symlink:
-
-```sh
-git clone https://github.com/tamp-workshop/note.git
-ln -s "$(pwd)/note/note" /usr/local/bin/tamp-note
-```
-
-**Recommended alias**: because `tamp-note` is a lot to type at 9am:
-
-```sh
-# ~/.zshrc or ~/.bashrc
-alias note='tamp-note'
-```
+No app. No subscription. No account. No sync service that goes away.
+Just files, a schema, and small tools that read and write them.
 
 ---
 
-## Usage
+## The idea
 
-```sh
-tamp-note "your thought here"     # append a timestamped entry to today's log
-tamp-note                         # open today's log in $EDITOR
-tamp-note open fonts              # open or create ~/Notes/fonts.md
-tamp-note find "parser"           # search across all notes
-tamp-note todo                    # list all open +todo items
-tamp-note done "parser bug"       # mark matching +todo as done
-tamp-note last [n]                # show last n entries (default: 10)
-tamp-note tags                    # all tags in use, with counts
-tamp-note help                    # the full picture
-```
+Most tools ask you to trust them with your data.
+You log in, you sync, you export and one day the app pivots,
+the company folds, or the pricing changes.
 
----
+tamp works differently. Your data is yours.
 
-## Tags
-
-Tags are plain text. No special syntax. Completely grep-friendly.
-
-| Tag | Purpose |
-|-----|---------|
-| `@dev` `@design` `@music` | Context → where does this belong? |
-| `+todo` | Something to act on |
-| `+read` `+idea` `+follow-up` | Other action types |
-
-```sh
-tamp-note "look into Harfbuzz shaping for variable fonts @design +todo"
-```
-
-`tamp-note tags` shows everything in use across your notes, with counts. Useful for noticing that you have forty-three `+todo` items and have done none of them. Motivating, in its own way.
-
----
-
-## Marking todos done
-
-```sh
-tamp-note done "Harfbuzz"
-# ✔  marked done in 2026-02-25.md
-```
-
-The line becomes `~~09:14 look into Harfbuzz...~~`. Struck through in markdown, excluded from future `tamp-note todo` output. Visible history, not silent deletion.
-
----
-
-## File structure
-
-Notes live in plain markdown files. Yours, forever.
+All files gather in `Notes`, but many of you might want to change the default behaviour in the config files.
 
 ```
 ~/Notes/
-  2026-02-25.md       # today's log → auto-created on first entry
-  2026-02-24.md
-  fonts.md            # thematic note (tamp-note open fonts)
-  compilers.md
+├── daily/      timestamped entries, one file per day
+├── notes/      thematic notes, plain markdown
+├── journal/    prose journal entries
+└── archive/    anything moved out of the way
 ```
 
----
-
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NOTES_DIR` | `~/Notes` | Where notes live |
-| `EDITOR` | `vim` | Editor for `tamp-note` and `tamp-note open` |
+Every file is readable without tamp. Every file is editable without tamp.
+tamp is a lens on your data, not a lock.
 
 ---
 
-## One zsh quirk worth knowing
+## Tools
 
-The `!` character triggers history expansion inside double quotes:
+### tamp-note
+
+The daily capture and triage tool.
 
 ```sh
-note "Ship it!"   # ❌ hangs in zsh
-note 'Ship it!'   # ✔  single quotes are your friend
+note "fix the parser edge case @dev +todo"
+note
 ```
 
-Or add `setopt NO_BANG_HIST` to your `~/.zshrc` and forget this ever came up.
+Quick-add from anywhere. A full TUI when you need to think.
+Local statistics that notice patterns without making noise.
+
+→ [packages/tamp-note](./packages/tamp-note)
+
+### tamp-task *(planned)*
+
+Todo and action management across your corpus.
+Reads the same files as tamp-note, no duplications.
+
+### tamp-insight *(planned)*
+
+Deeper statistical analysis and weekly summaries.
+Still local, still no API calls.
 
 ---
 
-## Part of tamp
+## Why I changed course
 
-A considered working environment for programmers who care.  
-[github.com/tamp-workshop](https://github.com/tamp-workshop) · MIT License
+tamp started as a single-file script. It grew quickly, and early versions
+tried to do too much in one place. Too many ideas didn't work with the sleek terminal commands I wanted to build at first. So now, we have a monolithic tool that mixed capture, search, statistics, and task management into one messy binary.
+
+The rewrite separates concerns cleanly:
+
+- **tamp-core** *shared data models, corpus access, statistics engine.
+  Every tool imports from here. No tool reads files directly.*
+
+- **tamp-note** *the capture and triage TUI. Fast. Keyboard-driven.
+  Does one thing well.*
+
+- **Future tools** *built on tamp-core, so they speak the same schema
+  without duplicating logic.*
+
+The schema is also now versioned and documented. Any tool that reads
+`~/Notes/` should declare which schema version it supports.
+
+---
+
+## The schema
+
+All tools share the same file format, documented in
+[SCHEMA.md](./SCHEMA.md).
+
+Entries look like this:
+
+```
+- 09:14 fix the parser edge case @dev +todo
+- 10:02 read SICP chapter 4 @dev +read
+~~09:14 fix the parser edge case @dev +todo~~
+```
+
+`@word` is a context. `+word` is an action. A strikethrough line is done.
+That's the whole format. Grep-friendly. Human-readable. Stable.
+
+---
+
+## Principles
+
+**Plain files, always.**
+Nothing in tamp writes a format you can't read with `cat`.
+
+**Local by default.**
+Statistics, patterns, search, ... all computed locally.
+Nothing is sent anywhere.
+
+**Small tools, sharp edges.**
+Each tool has a clear scope. When a tool grows beyond that scope,
+it becomes two tools.
+
+**Own your data.**
+If you stop using tamp tomorrow, your notes are still there,
+readable in any text editor, searchable with `grep`.
+
+---
+
+## Development
+
+tamp is a monorepo managed with [uv](https://github.com/astral-sh/uv).
+
+```sh
+git clone https://github.com/tamp-workshop/tamp
+cd tamp
+uv sync
+uv run pytest
+```
+
+```
+tamp/
+├── packages/
+│   ├── tamp-core/     shared library (models, corpus, config, stats)
+│   └── tamp-note/     the TUI tool
+├── SCHEMA.md          file format specification
+└── README.md          this file
+```
+
+---
+
+## Status
+
+`tamp-note` is actively used and maintained.
+`tamp-task` and `tamp-insight` are in design.
+
+Issues and ideas welcome.

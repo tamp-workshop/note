@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tamp-note"
+version = "0.8.0"
+description = "Daily notes, plain and simple."
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.60.0",
+    "rich>=13.0.0",
+    "tamp-core",
+]
+
+[project.scripts]
+tamp-note = "tamp_note.cli:main"
+
+[tool.uv.sources]
+tamp-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tamp_note"]

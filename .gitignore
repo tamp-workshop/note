@@ -1,14 +1,59 @@
-# macOS
+# ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store
 .AppleDouble
 .LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
 
-# Editor
+# ── Editor ────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.cursor/
 
-# Logs
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+sdist/
+.eggs/
+MANIFEST
+
+# ── uv / pip ──────────────────────────────────────────────────────────────────
+.venv/
+venv/
+.uv/
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# ── Type checking ─────────────────────────────────────────────────────────────
+.mypy_cache/
+.pytype/
+.ruff_cache/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
+
+# ── tamp user data — never commit personal notes ──────────────────────────────
+# Protects against accidentally committing ~/Notes if someone clones
+# into their notes directory, or if notes_dir is set inside the repo.
+*.md.bak
+/Notes/
+/notes/
