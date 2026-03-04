@@ -1,128 +1,92 @@
-# tamp v0.8.0
+# tamp
 
 > Small tools for people who think in plain text.
 
-tamp is a collection of command-line tools built around a single idea:
-your notes, tasks, and thoughts should live in plain markdown files
-that you own, on your machine, forever.
-
-No app. No subscription. No account. No sync service that goes away.
-Just files, a schema, and small tools that read and write them.
+![Tests](https://github.com/tamp-workshop/tamp/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-v0.8.0-D07878)
+![Python](https://img.shields.io/badge/python-3.11+-746E80)
+![License](https://img.shields.io/badge/license-MIT-8CA870)
 
 ---
 
-## The idea
-
-Most tools ask you to trust them with your data.
-You log in, you sync, you export and one day the app pivots,
-the company folds, or the pricing changes.
-
-tamp works differently. Your data is yours.
-
-All files gather in `Notes`, but many of you might want to change the default behaviour in the config files.
-
-```
-~/Notes/
-├── daily/      timestamped entries, one file per day
-├── notes/      thematic notes, plain markdown
-├── journal/    prose journal entries
-└── archive/    anything moved out of the way
-```
-
-Every file is readable without tamp. Every file is editable without tamp.
-tamp is a lens on your data, not a lock.
-
----
-
-## Tools
-
-### tamp-note
-
-The daily capture and triage tool.
+## Quick start
 
 ```sh
+# Install
+uv pip install tamp-note
+
+# Recommended alias
+echo "alias note='tamp-note'" >> ~/.zshrc
+
+# Quick-add a note
 note "fix the parser edge case @dev +todo"
+
+# Open the interactive TUI
 note
 ```
 
-Quick-add from anywhere. A full TUI when you need to think.
-Local statistics that notice patterns without making noise.
-
-→ [packages/tamp-note](./packages/tamp-note)
-
-### tamp-task *(planned)*
-
-Todo and action management across your corpus.
-Reads the same files as tamp-note, no duplications.
-
-### tamp-insight *(planned)*
-
-Deeper statistical analysis and weekly summaries.
-Still local, still no API calls.
+Notes land in `~/Notes/daily/YYYY-MM-DD.md` as plain markdown. No account, no sync service, no lock-in.
 
 ---
 
-## Why I changed course
+## What works now
 
-tamp started as a single-file script. It grew quickly, and early versions
-tried to do too much in one place. Too many ideas didn't work with the sleek terminal commands I wanted to build at first. So now, we have a monolithic tool that mixed capture, search, statistics, and task management into one messy binary.
+**Quick-add** — `note "text"` appends a timestamped entry and exits immediately.
 
-The rewrite separates concerns cleanly:
+**Interactive TUI** — `note` opens a full terminal interface. Type to add notes. `/` for commands.
 
-- **tamp-core** *shared data models, corpus access, statistics engine.
-  Every tool imports from here. No tool reads files directly.*
+**Slash commands** — `/todo`, `/find <query>`, `/last`, `/journal`, `/tags`, `/stats`, `/open`, `/new` and more. Type `/` to browse the command palette.
 
-- **tamp-note** *the capture and triage TUI. Fast. Keyboard-driven.
-  Does one thing well.*
+**Tags** — `@word` for context, `+word` for action type. Autocomplete as you type.
 
-- **Future tools** *built on tamp-core, so they speak the same schema
-  without duplicating logic.*
+**Journal** — `/journal` opens today's journal in `$EDITOR`, pre-filled with open todos.
 
-The schema is also now versioned and documented. Any tool that reads
-`~/Notes/` should declare which schema version it supports.
+**Local statistics** — `/stats` analyses your corpus. Nothing leaves your machine.
 
 ---
 
-## The schema
+## Example workflow
 
-All tools share the same file format, documented in
-[SCHEMA.md](./SCHEMA.md).
+```sh
+# Morning: quick capture
+note "planning call with design team @work +todo"
+note "interesting read on parser combinators @dev +read"
 
-Entries look like this:
-
-```
-- 09:14 fix the parser edge case @dev +todo
-- 10:02 read SICP chapter 4 @dev +read
-~~09:14 fix the parser edge case @dev +todo~~
+# Evening: open TUI to triage
+note
+> /todo          # interactive todo list
+> /last 5        # last 5 entries
+> /journal       # open today's journal in $EDITOR
 ```
 
-`@word` is a context. `+word` is an action. A strikethrough line is done.
-That's the whole format. Grep-friendly. Human-readable. Stable.
+---
+
+## File structure
+
+```
+~/Notes/
+├── daily/       YYYY-MM-DD.md   — timestamped entries
+├── journal/     YYYY-MM-DD.md   — prose journal entries
+├── notes/       *.md            — thematic notes
+└── archive/
+```
+
+Plain markdown. Edit directly, grep them, move them around.
+tamp is a lens on your data — not a lock.
 
 ---
 
-## Principles
+## Install
 
-**Plain files, always.**
-Nothing in tamp writes a format you can't read with `cat`.
+```sh
+uv pip install tamp-note
+```
 
-**Local by default.**
-Statistics, patterns, search, ... all computed locally.
-Nothing is sent anywhere.
-
-**Small tools, sharp edges.**
-Each tool has a clear scope. When a tool grows beyond that scope,
-it becomes two tools.
-
-**Own your data.**
-If you stop using tamp tomorrow, your notes are still there,
-readable in any text editor, searchable with `grep`.
+Requires Python 3.11+. Uses [uv](https://github.com/astral-sh/uv) for package management.
 
 ---
 
 ## Development
-
-tamp is a monorepo managed with [uv](https://github.com/astral-sh/uv).
 
 ```sh
 git clone https://github.com/tamp-workshop/tamp
@@ -134,17 +98,30 @@ uv run pytest
 ```
 tamp/
 ├── packages/
-│   ├── tamp-core/     shared library (models, corpus, config, stats)
+│   ├── tamp-core/     shared data layer (models, corpus, config, stats)
 │   └── tamp-note/     the TUI tool
-├── SCHEMA.md          file format specification
-└── README.md          this file
+├── ARCHITECTURE.md    design decisions and tradeoffs
+├── CONTRIBUTING.md    how to contribute
+├── ROADMAP.md         what's planned and why
+└── SCHEMA.md          file format specification
 ```
 
 ---
 
-## Status
+## Roadmap
 
-`tamp-note` is actively used and maintained.
-`tamp-task` and `tamp-insight` are in design.
+See [ROADMAP.md](./ROADMAP.md). Short version:
 
-Issues and ideas welcome.
+- **Now** — fix known UI issues, inline `/todo`, improve test coverage
+- **Next** — `tamp-task`: task management on the same corpus
+- **Later** — `tamp-insight`: weekly statistical digests, local only
+
+---
+
+## Why we changed course
+
+tamp started as a single shell script. The rewrite in March 2026 split it into a proper monorepo so future tools can share the same data layer without duplicating logic. Full story in [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+---
+
+`tamp-note` is actively used and maintained. Issues and ideas welcome.
