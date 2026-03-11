@@ -100,21 +100,20 @@ class DailyLog:
         return cls(date=log_date, path=path, entries=entries, lines=lines)
 
     def write(self) -> None:
-        """Reconstruct and write the file, preserving non-entry lines."""
-        entry_map: dict[str, Entry] = {}
-        for e in self.entries:
-            entry_map[f"{e.time} {e.text}"] = e
+        """Reconstruct and write the file, preserving non-entry lines.
 
+        Walks _lines and self.entries in lockstep — entries are always
+        in the same order as they were parsed from the file. Avoids the
+        dict-key approach which silently drops duplicate (time, text) pairs.
+        """
+        entry_iter  = iter(self.entries)
         out_lines: list[str] = []
         for line in self._lines:
-            entry = Entry.parse(line, self.date)
-            if entry:
-                # Use the (potentially mutated) version from self.entries
-                key = f"{entry.time} {entry.text}"
-                if key in entry_map:
-                    out_lines.append(entry_map[key].to_line())
-                else:
-                    out_lines.append(line)
+            if Entry.parse(line, self.date) is not None:
+                try:
+                    out_lines.append(next(entry_iter).to_line())
+                except StopIteration:
+                    out_lines.append(line)   # safety: more lines than entries
             else:
                 out_lines.append(line)
 

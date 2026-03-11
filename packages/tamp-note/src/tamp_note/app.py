@@ -402,25 +402,32 @@ class HelpPanel(Static):
     # Using Rich markup for colour.
     CONTENT = (
         f"[{C_AMBER}]commands[/{C_AMBER}]"
-        f"                                  [{C_AMBER}]keys[/{C_AMBER}]\n"
-        f"[{C_RED}]/todo[/{C_RED}]      interactive todo list"
-        f"       [{C_RED}]?[/{C_RED}]        this help\n"
-        f"[{C_RED}]/find <q>[/{C_RED}]  full-text search"
+        f"                                     [{C_AMBER}]keys[/{C_AMBER}]\n"
+        f"[{C_RED}]/todo[/{C_RED}]         interactive todo list"
+        f"        [{C_RED}]?[/{C_RED}]        this help\n"
+        f"[{C_RED}]/find <q>[/{C_RED}]     full-text search"
         f"             [{C_RED}]↑ / ↓[/{C_RED}]   command history\n"
-        f"[{C_RED}]/last [n][/{C_RED}]  recent entries"
+        f"[{C_RED}]/last [n][/{C_RED}]     recent entries"
         f"               [{C_RED}]ctrl+r[/{C_RED}]  jump to /find\n"
-        f"[{C_RED}]/journal[/{C_RED}]   open today's journal"
-        f"         [{C_RED}]ctrl+d[/{C_RED}]  quit\n"
-        f"[{C_RED}]/tags[/{C_RED}]      tag counts"
-        f"                   [{C_RED}]q[/{C_RED}]        quit (empty input)\n"
-        f"[{C_RED}]/stats[/{C_RED}]     corpus stats + patterns\n"
-        f"[{C_RED}]/ls[/{C_RED}]        notes folder overview\n"
-        f"[{C_RED}]/open <n>[/{C_RED}]  open or create a note\n"
-        f"[{C_RED}]/new <n>[/{C_RED}]   create a new note\n"
+        f"[{C_RED}]/status[/{C_RED}]       quick snapshot"
+        f"               [{C_RED}]ctrl+d[/{C_RED}]  quit\n"
+        f"[{C_RED}]/journal[/{C_RED}]      open today's journal"
+        f"         [{C_RED}]q[/{C_RED}]        quit (empty input)\n"
+        f"[{C_RED}]/tags [@tag][/{C_RED}]  tag counts, or filter by tag\n"
+        f"[{C_RED}]/stats[/{C_RED}]        corpus stats + patterns\n"
+        f"[{C_RED}]/open <n>[/{C_RED}]     open or create a thematic note\n"
+        f"[{C_RED}]/export [date][/{C_RED}] export entries to file\n"
+        f"[{C_RED}]/undo[/{C_RED}]         undo last done-mark or deletion\n"
+        f"[{C_RED}]/ls[/{C_RED}]           notes folder overview\n"
+        f"\n"
+        f"[{C_AMBER}]adding entries[/{C_AMBER}]\n"
+        f"[{C_MID}]just type and press enter — no command needed\n"
+        f"add +todo to any entry to create a todo   e.g.  call dentist +todo\n"
+        f"add +read, +buy, or any +tag to flag for later[/{C_MID}]\n"
         f"\n"
         f"[{C_AMBER}]tags[/{C_AMBER}]\n"
-        f"[{C_RED}]@word[/{C_RED}]  context  e.g. @dev @health\n"
-        f"[{C_RED}]+word[/{C_RED}]  action   e.g. +todo +read\n"
+        f"[{C_RED}]@word[/{C_RED}]  context   e.g. @dev @health\n"
+        f"[{C_RED}]+word[/{C_RED}]  action    e.g. +todo +read\n"
         f"[{C_MID}]type @ or + while writing to autocomplete known tags[/{C_MID}]"
     )
 
@@ -671,7 +678,8 @@ class TampNoteApp(App):
             yield Label(
                 f"[{C_BORDER}]?[/{C_BORDER}] help   "
                 f"[{C_BORDER}]/[/{C_BORDER}] commands   "
-                f"[{C_BORDER}]ctrl+d[/{C_BORDER}] quit",
+                f"[{C_BORDER}]ctrl+d[/{C_BORDER}] quit   "
+                f"[{C_DIM}]add +todo to any entry to create a todo[/{C_DIM}]",
                 id="hint-bar",
             )
             with Horizontal(id="status-bar"):

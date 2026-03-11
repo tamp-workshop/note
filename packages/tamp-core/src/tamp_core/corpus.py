@@ -2,19 +2,13 @@
 tamp_core.corpus
 ~~~~~~~~~~~~~~~~
 The single source of truth for reading and writing ~/Notes/.
-Every filesystem operation goes through Corpus — nothing else touches files directly.
-
-Directory layout:
-  ~/Notes/
-    daily/      YYYY-MM-DD.md          one file per day, timestamped entries
-    notes/      <name>.md              thematic notes
-    journal/    YYYY-MM-DD.md          prose journal entries (separate from daily log)
-    archive/    anything moved here
+Every operation goes through Corpus — no other code touches the filesystem directly.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import subprocess
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .config import Config
@@ -22,9 +16,18 @@ from .models import DailyLog, Entry, JournalEntry, Note
 
 
 class Corpus:
+    """
+    Reads and writes ~/Notes/ according to the tamp schema.
+
+    Usage:
+        corpus = Corpus(Config.load())
+        today  = corpus.today()
+        todos  = corpus.open_todos()
+    """
 
     def __init__(self, config: Config) -> None:
-        self.config = config
+        self.config     = config
+        self._undo_stack: list[dict] = []   # session-scoped, in-memory only
         config.ensure_dirs()
 
     # ── Daily logs ────────────────────────────────────────────────────────────
@@ -46,71 +49,47 @@ class Corpus:
         return f"# {d.strftime('%A, %B %-d %Y')}\n"
 
     def append_entry(self, text: str, d: date | None = None) -> Entry:
-        """Append a timestamped entry to a daily log. Returns the new Entry."""
+        """Append a new timestamped entry to a daily log."""
         d    = d or date.today()
-        path = self.daily_path(d)
+        log  = self.load_daily(d)
         now  = datetime.now().strftime("%H:%M")
+        path = self.daily_path(d)
+
         line = f"- {now} {text}"
-
-        # Ensure the file exists first
-        self.load_daily(d)
-
         with open(path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
         entry = Entry.parse(line, d)
-        assert entry is not None, f"Failed to parse entry we just wrote: {line!r}"
+        assert entry is not None
         return entry
 
     def all_logs(self, limit: int | None = None) -> list[DailyLog]:
-        """All daily logs, newest first."""
+        """Return all daily logs, newest first."""
         paths = sorted(self.config.daily_dir.glob("????-??-??.md"), reverse=True)
-        if limit is not None:
+        if limit:
             paths = paths[:limit]
         return [DailyLog.from_path(p) for p in paths]
 
+    def logs_since(self, d: date) -> list[DailyLog]:
+        """Return logs from d onwards (inclusive), newest first."""
+        return [
+            log for log in self.all_logs()
+            if log.date >= d
+        ]
+
+    # ── Entries (cross-log) ────────────────────────────────────────────────
+
     def all_entries(self, limit_logs: int | None = None) -> list[Entry]:
-        """All entries across all logs, newest first."""
         entries = []
         for log in self.all_logs(limit=limit_logs):
             entries.extend(log.entries)
         return entries
 
     def open_todos(self) -> list[Entry]:
-        """All undone entries tagged +todo, across all logs."""
         return [e for e in self.all_entries() if not e.done and "todo" in e.actions]
 
     def open_signals(self) -> list[Entry]:
-        """All undone entries with any action tag."""
         return [e for e in self.all_entries() if not e.done and e.actions]
-
-    def search(self, query: str) -> list[Entry]:
-        """Case-insensitive full-text search across all entries."""
-        q = query.lower()
-        return [e for e in self.all_entries() if q in e.text.lower()]
-
-    def recent_entries(self, n: int = 10) -> list[Entry]:
-        return self.all_entries()[:n]
-
-    def mark_done(self, entry: Entry) -> None:
-        """Mark an entry done and write the change back to disk."""
-        log = self.load_daily(entry.date)
-        for e in log.entries:
-            if e.time == entry.time and e.text == entry.text:
-                e.done = True
-                break
-        log.write()
-
-    def tag_counts(self) -> dict[str, int]:
-        """Count of each @context and +action tag across all entries."""
-        from collections import Counter
-        counter: Counter = Counter()
-        for entry in self.all_entries():
-            for tag in entry.contexts:
-                counter[f"@{tag}"] += 1
-            for tag in entry.actions:
-                counter[f"+{tag}"] += 1
-        return dict(counter.most_common())
 
     def entries_by_tag(self, tag: str) -> list[Entry]:
         tag = tag.lstrip("@+")
@@ -118,6 +97,29 @@ class Corpus:
             e for e in self.all_entries()
             if tag in e.contexts or tag in e.actions
         ]
+
+    def search(self, query: str) -> list[Entry]:
+        q = query.lower()
+        return [e for e in self.all_entries() if q in e.text.lower()]
+
+    def mark_done(self, entry: Entry) -> None:
+        """Mark an entry as done and write the change back to disk."""
+        log = self.load_daily(entry.date)
+        for e in log.entries:
+            if e.time == entry.time and e.text == entry.text:
+                e.done = True
+                break
+        log.write()
+        self._undo_stack.append({
+            "op":   "mark_done",
+            "time": entry.time,
+            "text": entry.text,
+            "date": entry.date,
+        })
+
+    def recent_entries(self, n: int = 10) -> list[Entry]:
+        entries = self.all_entries()
+        return entries[:n]
 
     # ── Thematic notes ────────────────────────────────────────────────────────
 
@@ -130,7 +132,6 @@ class Corpus:
         return Note(name=name, path=path)
 
     def create_note(self, name: str) -> Note:
-        """Create a note if it doesn't exist, return it either way."""
         note = self.get_note(name)
         if not note.path.exists():
             note.path.write_text(f"# {note.title}\n\n", encoding="utf-8")
@@ -138,8 +139,6 @@ class Corpus:
 
     def rename_note(self, old: str, new: str) -> Note:
         old_note = self.get_note(old)
-        if not old_note.path.exists():
-            raise FileNotFoundError(f"Note not found: {old}")
         new_note = self.get_note(new)
         old_note.path.rename(new_note.path)
         return new_note
@@ -147,78 +146,111 @@ class Corpus:
     def delete_note(self, name: str) -> None:
         note = self.get_note(name)
         if note.path.exists():
+            content = note.path.read_text(encoding="utf-8")
             note.path.unlink()
+            self._undo_stack.append({
+                "op":      "delete_note",
+                "name":    name,
+                "path":    note.path,
+                "content": content,
+            })
+
+    def undo_last(self) -> str | None:
+        """Revert the most recent write operation.
+
+        Returns a human-readable description of what was undone,
+        or None if the stack is empty.
+        """
+        if not self._undo_stack:
+            return None
+
+        record = self._undo_stack.pop()
+
+        if record["op"] == "mark_done":
+            log = self.load_daily(record["date"])
+            for e in log.entries:
+                if e.time == record["time"] and e.text == record["text"]:
+                    e.done = False
+                    break
+            log.write()
+            return f"{record['time']} {record['text']} — marked undone"
+
+        if record["op"] == "delete_note":
+            record["path"].write_text(record["content"], encoding="utf-8")
+            return f"{record['name']}.md restored"
+
+        return None  # unknown op, stack was corrupted — silently discard
+
+    def get_log(self, d: date) -> DailyLog | None:
+        """Load a daily log for a given date. Returns None if no file exists."""
+        path = self.daily_path(d)
+        if not path.exists():
+            return None
+        return DailyLog.from_path(path)
 
     # ── Journal ───────────────────────────────────────────────────────────────
-    #
-    # Journal entries live in ~/Notes/journal/YYYY-MM-DD.md
-    # They are separate from daily logs — prose, not timestamped entries.
 
     def journal_path(self, d: date | None = None) -> Path:
         d = d or date.today()
-        return self.config.journal_dir / f"{d.isoformat()}.md"
+        return self.config.daily_dir / f"{d.isoformat()}-journal.md"
 
     def get_journal(self, d: date | None = None) -> JournalEntry:
         d    = d or date.today()
         path = self.journal_path(d)
         return JournalEntry(date=d, path=path)
 
-    def ensure_journal_file(self, d: date | None = None) -> Path:
-        """Create the journal file with a header if it doesn't exist. Return its path."""
-        d    = d or date.today()
-        path = self.journal_path(d)
-        if not path.exists():
-            todos = self.load_daily(d).todos
-            lines = [f"# {d.strftime('%B %-d, %Y')}\n", ""]
-            if todos:
-                lines.append("<!-- open todos today -->")
-                for t in todos:
-                    lines.append(f"<!-- {t.clean_text} -->")
-                lines.append("")
-            path.write_text("\n".join(lines), encoding="utf-8")
-        return path
+    def open_journal_in_editor(self, d: date | None = None) -> None:
+        """Open today's journal in $EDITOR with a prompt pre-filled."""
+        d       = d or date.today()
+        journal = self.get_journal(d)
+        if not journal.path.exists():
+            todos_today = self.load_daily(d).todos
+            prompt_lines = [
+                f"# {d.strftime('%B %-d, %Y')}\n",
+                "",
+            ]
+            if todos_today:
+                prompt_lines.append("<!-- open today -->");
+                for t in todos_today:
+                    prompt_lines.append(f"<!-- {t.clean_text} -->")
+                prompt_lines.append("")
+            journal.path.write_text("\n".join(prompt_lines), encoding="utf-8")
 
-    def rename_journal(self, old_date: date, new_name: str) -> Path:
-        """
-        Rename a journal file. new_name should be a date string (YYYY-MM-DD)
-        or a freeform name. The .md extension is added if missing.
-        """
-        old_path = self.journal_path(old_date)
-        if not old_path.exists():
-            raise FileNotFoundError(f"Journal not found: {old_path.name}")
-        if not new_name.endswith(".md"):
-            new_name = new_name + ".md"
-        new_path = self.config.journal_dir / new_name
-        old_path.rename(new_path)
-        return new_path
+        editor = self.config.resolve_editor()
+        subprocess.run([editor, str(journal.path)])
 
-    # ── Folder overview ───────────────────────────────────────────────────────
+    # ── All-tags overview ─────────────────────────────────────────────────────
 
-    def ls(self) -> dict:
-        """Return a summary of the Notes directory structure."""
-        daily_files   = sorted(self.config.daily_dir.glob("????-??-??.md"), reverse=True)
-        note_files    = sorted(self.config.notes_subdir.glob("*.md"))
-        journal_files = sorted(self.config.journal_dir.glob("*.md"), reverse=True)
-        return {
-            "root":    str(self.config.notes_dir),
-            "daily":   [f.stem for f in daily_files],
-            "notes":   [f.stem for f in note_files],
-            "journal": [f.stem for f in journal_files],
-        }
+    def tag_counts(self) -> dict[str, int]:
+        from collections import Counter
+        c: Counter = Counter()
+        for entry in self.all_entries():
+            for t in entry.contexts:
+                c[f"@{t}"] += 1
+            for t in entry.actions:
+                c[f"+{t}"] += 1
+        return dict(c.most_common())
 
     # ── Migration ─────────────────────────────────────────────────────────────
 
     def migrate_flat(self, source_dir: Path) -> list[Path]:
-        """Migrate flat ~/Notes/*.md files (old schema) into daily/ and notes/."""
-        import re
-        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}\.md$")
+        """
+        Migrate flat ~/Notes/*.md files (old schema) to daily/ + notes/.
+        Returns list of migrated paths.
+        """
         migrated = []
+        date_pattern = __import__("re").compile(r"^\d{4}-\d{2}-\d{2}\.md$")
+
         for path in source_dir.glob("*.md"):
             if date_pattern.match(path.name):
                 dest = self.config.daily_dir / path.name
+                if not dest.exists():
+                    path.rename(dest)
+                    migrated.append(dest)
             else:
                 dest = self.config.notes_subdir / path.name
-            if not dest.exists():
-                path.rename(dest)
-                migrated.append(dest)
+                if not dest.exists():
+                    path.rename(dest)
+                    migrated.append(dest)
+
         return migrated
