@@ -223,7 +223,9 @@ def test_cmd_stats(corpus):
 
 
 def test_cmd_help(corpus):
-    from tamp_note.commands import dispatch
-    result = dispatch(corpus, "/help")
-    assert "/todo" in result.output
-    assert "/find" in result.output
+    from tamp_note.commands import REGISTRY
+    from tamp_note.app import HelpPanel
+    assert "todo" in REGISTRY
+    assert "find" in REGISTRY
+    assert "/todo" in HelpPanel.CONTENT
+    assert "/find" in HelpPanel.CONTENT
